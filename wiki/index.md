@@ -2,14 +2,12 @@
 
 ## Sources
 
-- [[sources/karpathy-wiki-test]] - Streszczenie źródła.
-
-Na razie brak źródeł.
+- [[sources/karpathy-wiki-test]] - Test koncepcji LLM Wiki: model buduje trwałą bazę wiedzy w Markdown, w kontrze do klasycznego RAG.
 
 ## Entities
 
-Na razie brak stron encji.
+- [[entities/none]] - Brak encji zidentyfikowanych w tym źródle.
 
 ## Concepts
 
-Na razie brak stron pojęć.
+- [[concepts/llm-wiki]] - Koncepcja LLM Wiki: trwała baza wiedzy w plikach Markdown.
