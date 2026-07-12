@@ -1,53 +1,32 @@
-from pathlib import Path
+import shutil
 
-from utils import PROJECT_ROOT, write_text_file
-
-
-def remove_markdown_files(directory: Path) -> None:
-    if not directory.exists():
-        directory.mkdir(parents=True, exist_ok=True)
-        return
-
-    for file_path in directory.glob("*.md"):
-        file_path.unlink()
+from .utils import PROJECT_ROOT
 
 
 def reset_wiki() -> None:
     wiki_root = PROJECT_ROOT / "wiki"
+    raw_root = PROJECT_ROOT / "raw"
 
-    remove_markdown_files(wiki_root / "sources")
-    remove_markdown_files(wiki_root / "entities")
-    remove_markdown_files(wiki_root / "concepts")
+    if wiki_root.exists():
+        for item in wiki_root.iterdir():
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
+    else:
+        wiki_root.mkdir(parents=True, exist_ok=True)
 
-    write_text_file(
-        wiki_root / "index.md",
-        """# LLM Wiki - Index
+    wiki_root.mkdir(parents=True, exist_ok=True)
 
-## Sources
+    print(f"Wyczyszczono zawartość folderu Wiki: {wiki_root}")
+    print("Folder wiki/ pozostał na miejscu.")
 
-## Entities
-
-## Concepts
-""",
-    )
-
-    write_text_file(
-        wiki_root / "log.md",
-        """# LLM Wiki - Log
-
-Dziennik operacji wykonywanych na wiki.
-""",
-    )
-
-    write_text_file(
-        wiki_root / "overview.md",
-        """# Overview
-
-To jest robocza baza wiedzy budowana przez AI na podstawie źródeł z folderu raw/.
-""",
-    )
-
-    print("Wiki została wyczyszczona. Folder raw/ nie został zmieniony.")
+    if raw_root.exists():
+        raw_files = [path for path in raw_root.rglob("*") if path.is_file()]
+        print(f"Folder raw/ pozostał bez zmian: {raw_root}")
+        print(f"Liczba zachowanych plików źródłowych: {len(raw_files)}")
+    else:
+        print(f"Uwaga: folder raw/ nie istnieje: {raw_root}")
 
 
 if __name__ == "__main__":

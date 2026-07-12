@@ -1,43 +1,45 @@
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 import re
-import json
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def read_text_file(path: Path) -> str:
-    if not path.exists():
+    if not path.is_file():
         raise FileNotFoundError(f"Nie znaleziono pliku: {path}")
-    
-    return path.read_text(encoding = "utf-8")
+
+    return path.read_text(encoding="utf-8")
 
 
 def write_text_file(path: Path, content: str) -> None:
-    path.parent.mkdir(parents = True, exist_ok = True)
-    path. write_text(content, encoding = "utf-8")
-    
-    
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
 def append_to_log(message: str) -> None:
     log_path = PROJECT_ROOT / "wiki" / "log.md"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
     today = datetime.now().strftime("%Y-%m-%d")
-    
-    with log_path.open("a", encoding = "utf-8") as file:
+
+    with log_path.open("a", encoding="utf-8") as file:
         file.write(f"\n\n## [{today}] ingest | {message}\n")
-        
-        
-def slugify(text:str) -> str:
+
+
+def slugify(text: str) -> str:
     text = text.lower()
     text = re.sub(r"[^a-z0-9ąćęłńóśźż]+", "-", text)
     text = text.strip("-")
+
     return text or "untitled"
 
 
 def normalize_wiki_path(path: str) -> Path:
     """
     Zamienia ścieżkę z index.md, np. 'concepts/llm-wiki',
-    na realną ścieżkę pliku: wiki/concepts/llm-wiki.md.
+    na rzeczywistą ścieżkę pliku: wiki/concepts/llm-wiki.md.
     """
     clean_path = path.strip()
 
@@ -53,7 +55,7 @@ def normalize_wiki_path(path: str) -> Path:
 def read_wiki_page(path: str) -> str:
     wiki_path = normalize_wiki_path(path)
 
-    if not wiki_path.exists():
+    if not wiki_path.is_file():
         raise FileNotFoundError(f"Nie znaleziono strony Wiki: {wiki_path}")
 
     return wiki_path.read_text(encoding="utf-8")
@@ -75,7 +77,7 @@ def list_wiki_content_files() -> list[Path]:
         wiki_root / "concepts",
     ]
 
-    files = []
+    files: list[Path] = []
 
     for folder in folders:
         files.extend(list_markdown_files(folder))
@@ -94,4 +96,4 @@ def path_to_wiki_ref(path: Path) -> str:
     wiki_root = PROJECT_ROOT / "wiki"
     relative_path = path.relative_to(wiki_root)
 
-    return str(relative_path.with_suffix(""))
+    return relative_path.with_suffix("").as_posix()

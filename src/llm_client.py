@@ -26,9 +26,4 @@ def ask_llm(prompt: str) -> str:
         input = prompt
     )
     
-    return response.output_text
-
-
-if __name__ == "__main__":
-    query = 'Ile dni ma lipiec?'
-    print(ask_llm(prompt = query))
+    return response.output_text 

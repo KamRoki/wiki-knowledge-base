@@ -2,8 +2,14 @@ import argparse
 import json
 from pathlib import Path
 
-from llm_client import ask_llm
-from utils import PROJECT_ROOT, read_text_file, write_text_file, append_to_log, slugify
+from .llm_client import ask_llm
+from .utils import (
+    PROJECT_ROOT,
+    append_to_log,
+    read_text_file,
+    slugify,
+    write_text_file,
+)
 
 
 def build_ingest_prompt(

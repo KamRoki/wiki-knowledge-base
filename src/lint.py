@@ -4,7 +4,7 @@ from typing import Any
 
 import frontmatter
 
-from utils import (
+from .utils import (
     PROJECT_ROOT,
     list_wiki_content_files,
     path_to_wiki_ref,

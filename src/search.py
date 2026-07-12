@@ -5,7 +5,7 @@ from pathlib import Path
 
 from rank_bm25 import BM25Okapi
 
-from utils import (
+from .utils import (
     list_wiki_content_files,
     path_to_wiki_ref,
     read_text_file,

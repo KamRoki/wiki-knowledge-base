@@ -2,9 +2,15 @@ import argparse
 import json
 from pathlib import Path
 
-from llm_client import ask_llm
-from utils import PROJECT_ROOT, read_text_file, read_wiki_page, write_text_file, slugify
-from search import search_wiki
+from .llm_client import ask_llm
+from .search import search_wiki
+from .utils import (
+    PROJECT_ROOT,
+    read_text_file,
+    read_wiki_page,
+    slugify,
+    write_text_file,
+)
 
 
 def build_page_selection_prompt(question: str, index_text: str) -> str:
