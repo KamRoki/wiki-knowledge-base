@@ -1,16 +1,11 @@
-import argparse
 import json
 from pathlib import Path
 
-from .llm_client import ask_llm
-from .search import search_wiki
-from .utils import (
-    PROJECT_ROOT,
-    read_text_file,
-    read_wiki_page,
-    slugify,
-    write_text_file,
-)
+from ..domain.answer_result import AnswerResult
+from ..infrastructure.file_utils import PROJECT_ROOT, read_text_file, slugify, write_text_file
+from ..infrastructure.llm_client import ask_llm
+from ..infrastructure.wiki_repository import read_wiki_page
+from .search_wiki import search_wiki
 
 
 def build_page_selection_prompt(question: str, index_text: str) -> str:
@@ -125,7 +120,7 @@ Kontekst z Wiki:
 """.strip()
 
 
-def answer_question(question: str, selected_paths: list[str]) -> str:
+def generate_answer(question: str, selected_paths: list[str]) -> str:
     context = load_selected_pages(selected_paths)
 
     if not context.strip():
@@ -180,7 +175,16 @@ def save_answer(question: str, answer: str, selected_paths: list[str]) -> Path:
     return output_path
 
 
-def query_wiki(question: str, save: bool = False, mode: str = "search") -> None:
+def select_relevant_pages_with_search(question: str, limit: int = 5) -> list[str]:
+    results = search_wiki(
+        query=question,
+        limit=limit,
+    )
+
+    return [result.ref for result in results]
+
+
+def answer_question(question: str, save: bool = False, mode: str = "search") -> AnswerResult:
     if mode == "search":
         selected_paths = select_relevant_pages_with_search(
             question=question,
@@ -197,63 +201,23 @@ def query_wiki(question: str, save: bool = False, mode: str = "search") -> None:
     else:
         raise ValueError("Nieznany tryb. Użyj: search albo llm.")
 
-    print("\nWybrane strony Wiki:")
-    if selected_paths:
-        for path in selected_paths:
-            print(f"- {path}")
-    else:
-        print("- brak")
-
-    answer = answer_question(
+    answer = generate_answer(
         question=question,
         selected_paths=selected_paths,
     )
 
-    print("\nOdpowiedź:\n")
-    print(answer)
+    saved_path = None
 
     if save:
-        output_path = save_answer(
+        saved_path = save_answer(
             question=question,
             answer=answer,
             selected_paths=selected_paths,
         )
 
-        print(f"\nOdpowiedź zapisana jako: {output_path}")
-        
-        
-def select_relevant_pages_with_search(question: str, limit: int = 5) -> list[str]:
-    results = search_wiki(
-        query=question,
-        limit=limit,
+    return AnswerResult(
+        question=question,
+        selected_paths=selected_paths,
+        answer=answer,
+        saved_path=saved_path,
     )
-
-    return [result.ref for result in results]
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Zadaj pytanie do lokalnej Wiki.")
-    parser.add_argument("question", help="Pytanie do Wiki.")
-    parser.add_argument(
-        "--save",
-        action="store_true",
-        help="Zapisz odpowiedź jako nową stronę Wiki.",
-    )
-    parser.add_argument(
-    "--mode",
-    choices=["search", "llm"],
-    default="search",
-    help="Sposób wyboru stron Wiki: search albo llm.",
-)
-
-    args = parser.parse_args()
-
-    query_wiki(
-    question=args.question,
-    save=args.save,
-    mode=args.mode,
-)
-
-
-if __name__ == "__main__":
-    main()

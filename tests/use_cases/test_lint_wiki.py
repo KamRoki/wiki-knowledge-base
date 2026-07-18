@@ -1,5 +1,5 @@
-from src.lint import extract_obsidian_links, wiki_ref_to_path
-from src.utils import PROJECT_ROOT
+from src.use_cases.lint_wiki import extract_obsidian_links, wiki_ref_to_path
+from src.infrastructure.file_utils import PROJECT_ROOT
 
 
 def test_extract_obsidian_links_simple():

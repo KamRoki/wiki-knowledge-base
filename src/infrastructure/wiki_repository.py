@@ -1,47 +1,18 @@
 from datetime import datetime
 from pathlib import Path
-import re
 
+from .file_utils import PROJECT_ROOT, list_markdown_files
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-
-def read_text_file(path: Path) -> str:
-    """
-    Read and return the contents of a UTF-8 encoded text file.
-    
-    Args:
-        path: Path to the file that should be read.
-        
-    Returns:
-        The complete contents of the file.
-    """
-    if not path.is_file():
-        raise FileNotFoundError(f"Nie znaleziono pliku: {path}")
-
-    return path.read_text(encoding="utf-8")
-
-
-def write_text_file(path: Path, content: str) -> None:
-    """
-    Write the content to a UTF-8 encoded file.
-    
-    Missing parent directories are created automatically. If the target already exists, its contents are overwritten.
-    
-    Args:
-        path: Path to the file that sould be created or overwritten.
-        content: Text content to write to the file.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+from ..domain.wiki_page import WikiPage
+from .file_utils import read_text_file
 
 
 def append_to_log(message: str) -> None:
     """
     Append a dated ingestion entry to the wiki operation log.
-    
+
     The log is stored in wiki/log.md. The parent directory is created automatically if it does not exist.
-    
+
     Args:
         message: Description of the ingestion operation to append to the log.
     """
@@ -52,27 +23,6 @@ def append_to_log(message: str) -> None:
 
     with log_path.open("a", encoding="utf-8") as file:
         file.write(f"\n\n## [{today}] ingest | {message}\n")
-
-
-def slugify(text: str) -> str:
-    """
-    Convert text into a filesystem-friendly slug.
-    
-    The function converts the text to lowercase,replaces sequences of
-    unsupported characters with hyphens,and removes leading and trailing
-    hyphens. Polish letters and digits are preserved.
-    
-    Args:
-        text: Text to convert into a slug.
-        
-    Returns:
-        A normalized slug or 'untitled' if the result is empty.
-    """
-    text = text.lower()
-    text = re.sub(r"[^a-z0-9ąćęłńóśźż]+", "-", text)
-    text = text.strip("-")
-
-    return text or "untitled"
 
 
 def normalize_wiki_path(path: str) -> Path:
@@ -121,25 +71,6 @@ def read_wiki_page(path: str) -> str:
         raise FileNotFoundError(f"Nie znaleziono strony Wiki: {wiki_path}")
 
     return wiki_path.read_text(encoding="utf-8")
-
-
-def list_markdown_files(directory: Path) -> list[Path]:
-    """
-    Return Markdown files located directly inside a directory.
-
-    The function does not search recursively.
-
-    Args:
-        directory: Directory to inspect.
-
-    Returns:
-        A sorted list of paths to ``.md`` files. An empty list is returned
-        if the directory does not exist.
-    """
-    if not directory.exists():
-        return []
-
-    return sorted(directory.glob("*.md"))
 
 
 def list_wiki_content_files() -> list[Path]:
@@ -195,3 +126,12 @@ def path_to_wiki_ref(path: Path) -> str:
     relative_path = path.relative_to(wiki_root)
 
     return relative_path.with_suffix("").as_posix()
+
+
+def list_wiki_pages() -> list[WikiPage]:
+    files = list_wiki_content_files()
+    return [
+        WikiPage(ref = path_to_wiki_ref(f), 
+                 path = f,
+                 content = read_text_file(f)) for f in files
+    ]

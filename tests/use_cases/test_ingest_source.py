@@ -1,6 +1,6 @@
 import pytest
 
-from src.ingest import parse_llm_json, ensure_required_keys
+from src.use_cases.ingest_source import parse_llm_json, ensure_required_keys
 
 
 def test_parse_llm_json_valid_response():

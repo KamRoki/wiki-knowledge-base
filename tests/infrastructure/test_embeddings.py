@@ -1,4 +1,4 @@
-from src.search import tokenize, make_snippet
+from src.infrastructure.embeddings import tokenize, make_snippet
 
 
 def test_tokenize_basic_query():

@@ -12,7 +12,7 @@ Instead of answering every question directly from raw files,the application grad
 - generated query answers,
 - wiki health reports.
 
-The resulting knowledge base can be browsed directly in the file system or opened in tools such as Obsidian.
+The resulting knowledge base can be browsed directly in the file system or opened in tools such as Obsidian. It can also be used through a conversational AI agent (LangGraph) with a Streamlit chat interface, in addition to the command-line tools.
 
 ## Core Idea
 
@@ -36,83 +36,59 @@ The raw documents remain unchanged. Knowledge extracted from them is stored perm
 - Generate source,entity,and concept pages using an LLM.
 - Store knowledge as human-readable Markdown.
 - Use Obsidian-style links between pages.
-- Search the wiki locally with BM25.
-- Select relevant pages either with local search or an LLM.
+- Search the wiki locally using semantic search (OpenAI embeddings).
+- Select relevant pages either with semantic search or an LLM.
 - Generate answers based only on selected wiki pages.
 - Save generated answers as Markdown pages.
 - Validate frontmatter,links,index coverage,and orphan pages.
 - Reset generated wiki content without deleting raw documents.
+- Talk to the wiki through an AI agent (LangGraph) with two skills — `answer_wiki` and `ingest_wiki` — exposed via a Streamlit chat UI.
 
 ## Project Architecture
 
+The codebase follows a simplified **Clean Architecture**: business logic (`use_cases/`) is independent from technical details (`infrastructure/`) and from the way it is triggered (`cli/`, `skills/` + `agent/`, `streamlit_app.py`). The CLI and the agent call the exact same use cases — no logic is duplicated between the two entry points.
+
 ```mermaid
 graph TB
-    subgraph USER["User"]
-        U[CLI User]
+    CLI_U["CLI user"]
+    WEB_U["Browser user"]
+
+    subgraph ADAPTERS["Adapters — how the system is triggered"]
+        CLI_LAYER["cli/<br/>5 terminal commands"]
+        STREAMLIT["streamlit_app.py<br/>chat UI"]
+        AGENT_LAYER["agent/ + skills/<br/>LangGraph agent · answer_wiki · ingest_wiki"]
     end
 
-    subgraph CLI["Command Line Interface"]
-        INGEST_CMD[python -m src.ingest]
-        QUERY_CMD[python -m src.query]
-        SEARCH_CMD[python -m src.search]
-        LINT_CMD[python -m src.lint]
-        RESET_CMD[python -m src.reset_wiki]
-    end
-
-    subgraph CORE["Application Modules"]
-        ING[ingest.py]
-        QRY[query.py]
-        SRCH[search.py]
-        LNT[lint.py]
-        RESET[reset_wiki.py]
-        LLM[llm_client.py]
-        UTIL[utils.py]
+    subgraph CORE["Core — Clean Architecture"]
+        USECASES["use_cases/<br/>business logic<br/>(ingest · search · answer · lint · reset)"]
+        DOMAIN["domain/<br/>plain data types"]
+        INFRA["infrastructure/<br/>OpenAI client · embeddings · file I/O"]
     end
 
     subgraph DATA["Local Data"]
-        RAW[(raw/<br/>immutable source documents)]
-        WIKI[(wiki/<br/>generated Markdown knowledge)]
-        RULES[AGENTS.md<br/>wiki generation rules]
+        RAW[("raw/<br/>immutable source documents")]
+        WIKI[("wiki/<br/>generated Markdown knowledge")]
     end
 
-    subgraph EXTERNAL["External Service"]
-        MODEL[OpenAI Model]
-    end
+    MODEL["OpenAI<br/>chat + embeddings"]
 
-    U --> INGEST_CMD
-    U --> QUERY_CMD
-    U --> SEARCH_CMD
-    U --> LINT_CMD
-    U --> RESET_CMD
+    CLI_U --> CLI_LAYER
+    WEB_U --> STREAMLIT
+    STREAMLIT --> AGENT_LAYER
 
-    INGEST_CMD --> ING
-    QUERY_CMD --> QRY
-    SEARCH_CMD --> SRCH
-    LINT_CMD --> LNT
-    RESET_CMD --> RESET
+    CLI_LAYER --> USECASES
+    AGENT_LAYER -->|both call the same use cases| USECASES
+    AGENT_LAYER -.->|decides which skill to call| MODEL
 
-    ING --> LLM
-    QRY --> LLM
-    QRY --> SRCH
+    USECASES --> DOMAIN
+    USECASES --> INFRA
+    INFRA <--> MODEL
 
-    ING --> UTIL
-    QRY --> UTIL
-    SRCH --> UTIL
-    LNT --> UTIL
-    RESET --> UTIL
-
-    LLM <--> MODEL
-
-    ING -->|reads| RAW
-    ING -->|reads| RULES
-    ING -->|writes| WIKI
-
-    SRCH -->|reads| WIKI
-    QRY -->|reads| WIKI
-    QRY -->|optionally writes answers| WIKI
-    LNT -->|validates| WIKI
-    RESET -->|clears contents| WIKI
+    USECASES -->|reads| RAW
+    USECASES -->|reads / writes| WIKI
 ```
+
+Every box above is a folder,not a single file — see **Repository Structure** for the exact files inside each layer,and **Main Modules** for what each file does. The one detail worth calling out here: the CLI and the agent are two different ways to *trigger* the system,but they both call the exact same `use_cases/` — no business logic is duplicated between them.
 
 ## Repository Structure
 
@@ -129,13 +105,36 @@ wiki-knowledge-base/
 │   └── log.md
 ├── src/
 │   ├── __init__.py
-│   ├── ingest.py
-│   ├── lint.py
-│   ├── llm_client.py
-│   ├── query.py
-│   ├── reset_wiki.py
-│   ├── search.py
-│   └── utils.py
+│   ├── domain/            # plain data types (dataclasses)
+│   │   ├── wiki_page.py
+│   │   ├── search_result.py
+│   │   ├── ingest_summary.py
+│   │   ├── answer_result.py
+│   │   └── reset_summary.py
+│   ├── use_cases/         # business logic, framework-independent
+│   │   ├── ingest_source.py
+│   │   ├── search_wiki.py
+│   │   ├── answer_question.py
+│   │   ├── lint_wiki.py
+│   │   └── reset_wiki.py
+│   ├── infrastructure/    # technical details
+│   │   ├── file_utils.py
+│   │   ├── wiki_repository.py
+│   │   ├── raw_repository.py
+│   │   ├── llm_client.py
+│   │   └── embeddings.py
+│   ├── cli/                # command-line adapters
+│   │   ├── ingest.py
+│   │   ├── search.py
+│   │   ├── query.py
+│   │   ├── lint.py
+│   │   └── reset_wiki.py
+│   ├── skills/              # LangChain tools used by the agent
+│   │   ├── answer_wiki.py
+│   │   └── ingest_wiki.py
+│   └── agent/                # LangGraph agent definition
+│       └── graph.py
+├── streamlit_app.py        # chat UI for the agent
 ├── tests/
 ├── AGENTS.md
 ├── pyproject.toml
@@ -177,7 +176,7 @@ It describes how the LLM should structure source pages,entity pages,concept page
 
 - Python 3.11
 - `uv`
-- OpenAI API key
+- OpenAI API key (used for chat completions and for embeddings)
 
 ## Installation
 
@@ -197,7 +196,7 @@ uv sync
 If the dependencies are not yet defined in `pyproject.toml`,add them with:
 
 ```bash
-uv add openai python-dotenv python-frontmatter rank-bm25
+uv add openai python-dotenv python-frontmatter langchain langchain-openai langgraph streamlit
 uv add --dev pytest
 ```
 
@@ -216,7 +215,7 @@ OPENAI_API_KEY=<your_key_here>
 OPENAI_MODEL=gpt-5-mini
 ```
 
-The `OPENAI_MODEL` variable is optional. If it is not provided,the application uses `gpt-5-mini`.
+The `OPENAI_MODEL` variable is optional. If it is not provided,the application uses `gpt-5-mini`. The same key is used for chat completions (ingest, query, agent) and for embeddings (semantic search).
 
 ## Usage
 
@@ -224,22 +223,12 @@ All commands should be executed from the project root.
 
 Because `src` is a Python package,the modules should be started with the `-m` flag.
 
-### Test the OpenAI Connection
-
-If the project contains a connection-check script,you can run it separately before ingestion.
-
-For example:
-
-```bash
-uv run python scripts/check_openai.py
-```
-
 ### Ingest a Source
 
 The source file must be located inside the `raw/` directory.
 
 ```bash
-uv run python -m src.ingest raw/articles/karpathy-wiki-test.md
+uv run python -m src.cli.ingest raw/articles/karpathy-wiki-test.md
 ```
 
 During ingestion,the application:
@@ -270,27 +259,27 @@ wiki/
 
 ### Query the Wiki
 
-The default query mode uses local BM25 search to select relevant pages.
+The default query mode uses local semantic search (embeddings) to select relevant pages.
 
 ```bash
-uv run python -m src.query "What is LLM Wiki?"
+uv run python -m src.cli.query "What is LLM Wiki?"
 ```
 
 This is equivalent to:
 
 ```bash
-uv run python -m src.query "What is LLM Wiki?" --mode search
+uv run python -m src.cli.query "What is LLM Wiki?" --mode search
 ```
 
 ### Query with Local Search
 
 ```bash
-uv run python -m src.query "What is LLM Wiki?" --mode search
+uv run python -m src.cli.query "What is LLM Wiki?" --mode search
 ```
 
 In this mode,the application:
 
-1. searches the local Markdown wiki with BM25,
+1. embeds every wiki page and the question, and ranks pages by semantic similarity,
 2. selects the highest-scoring pages,
 3. loads their contents,
 4. sends the selected context to the LLM,
@@ -299,7 +288,7 @@ In this mode,the application:
 ### Query with LLM Page Selection
 
 ```bash
-uv run python -m src.query "What is LLM Wiki?" --mode llm
+uv run python -m src.cli.query "What is LLM Wiki?" --mode llm
 ```
 
 In this mode,the LLM first reads `wiki/index.md` and selects up to five relevant pages. The application then loads those pages and asks the model to generate the final answer.
@@ -307,7 +296,7 @@ In this mode,the LLM first reads `wiki/index.md` and selects up to five relevant
 ### Save a Generated Answer
 
 ```bash
-uv run python -m src.query "What is LLM Wiki?" --save
+uv run python -m src.cli.query "What is LLM Wiki?" --save
 ```
 
 The answer is saved as a Markdown page in the wiki.
@@ -315,31 +304,33 @@ The answer is saved as a Markdown page in the wiki.
 The command can also be combined with a selection mode:
 
 ```bash
-uv run python -m src.query "What is LLM Wiki?" --mode llm --save
+uv run python -m src.cli.query "What is LLM Wiki?" --mode llm --save
 ```
 
 ### Search the Wiki Locally
 
 ```bash
-uv run python -m src.search "LLM Wiki"
+uv run python -m src.cli.search "LLM Wiki"
 ```
 
 Limit the number of returned results:
 
 ```bash
-uv run python -m src.search "LLM Wiki" --limit 10
+uv run python -m src.cli.search "LLM Wiki" --limit 10
 ```
 
-The search module uses BM25 and returns:
+The search command uses semantic search (OpenAI embeddings, no local keyword index) and returns:
 
 - the wiki reference,
 - the relevance score,
 - a short text snippet.
 
+Because every search embeds the wiki pages through the OpenAI API,it requires network access and incurs a (small) API cost,unlike a purely local keyword index.
+
 ### Validate Wiki Health
 
 ```bash
-uv run python -m src.lint
+uv run python -m src.cli.lint
 ```
 
 The linter checks:
@@ -368,7 +359,7 @@ Possible health statuses:
 ### Reset the Wiki
 
 ```bash
-uv run python -m src.reset_wiki
+uv run python -m src.cli.reset_wiki
 ```
 
 The reset command removes all generated content inside `wiki/` while preserving the empty `wiki/` directory.
@@ -383,6 +374,19 @@ wiki/
 ```
 
 but the generated knowledge inside `wiki/` will be removed.
+
+### Talk to the Wiki Through the Agent (Streamlit)
+
+```bash
+uv run streamlit run streamlit_app.py
+```
+
+This opens a chat interface backed by a LangGraph agent with two skills:
+
+- **`answer_wiki`** — used when the message is a question about the wiki. It runs the same semantic search and answer generation as `src.cli.query --mode search`.
+- **`ingest_wiki`** — used when the message asks to ingest a file from `raw/`. It runs the same logic as `src.cli.ingest`.
+
+The agent decides which skill to use based on the message. The sidebar lists the files currently in `raw/` and offers a button that sends an ingest request for the selected file,so the file name is always exact instead of being guessed from free text.
 
 ## Running Tests
 
@@ -401,35 +405,39 @@ uv run pytest -v
 Run a specific test file:
 
 ```bash
-uv run pytest tests/test_ingest.py
+uv run pytest tests/use_cases/test_ingest_source.py
 ```
 
 ## Main Modules
 
-### `src/ingest.py`
+### `src/domain/`
 
-Transforms a raw source document into structured Markdown wiki pages.
+Plain dataclasses describing the core concepts of the system (`WikiPage`,`SearchResult`,`IngestSummary`,`AnswerResult`,`ResetSummary`). No dependency on the rest of the codebase.
 
-### `src/query.py`
+### `src/use_cases/`
 
-Selects relevant wiki pages and generates an answer based on their contents.
+Business logic,independent from the CLI,the agent,or Streamlit:
 
-### `src/search.py`
+- `ingest_source.py` — transforms a raw source document into structured Markdown wiki pages.
+- `search_wiki.py` — finds wiki pages relevant to a query.
+- `answer_question.py` — selects relevant wiki pages and generates an answer based on their contents.
+- `lint_wiki.py` — validates the structure and consistency of the wiki.
+- `reset_wiki.py` — clears all generated wiki knowledge while preserving the `wiki/` and `raw/` directories.
 
-Provides local BM25-based retrieval over generated Markdown pages.
+### `src/infrastructure/`
 
-### `src/lint.py`
+Technical details used by the use cases:
 
-Validates the structure and consistency of the wiki.
+- `llm_client.py` — shared OpenAI client and chat completion helper.
+- `embeddings.py` — semantic search over wiki pages using OpenAI embeddings.
+- `wiki_repository.py` — reading/writing wiki pages,`index.md`,and `log.md`.
+- `raw_repository.py` — listing and validating files inside `raw/`.
+- `file_utils.py` — generic file I/O and slug creation.
 
-### `src/reset_wiki.py`
+### `src/cli/`
 
-Clears all generated wiki knowledge while preserving the `wiki/` and `raw/` directories.
+Thin `argparse` wrappers around the use cases — the commands documented above.
 
-### `src/llm_client.py`
+### `src/skills/` and `src/agent/`
 
-Provides a shared OpenAI client and model invocation function.
-
-### `src/utils.py`
-
-Contains shared helpers for file operations,path normalization,slug creation,logging,and wiki references.
+`skills/` exposes `answer_wiki` and `ingest_wiki` as LangChain tools that call the same use cases as the CLI. `agent/graph.py` wires them into a LangGraph agent (an LLM node with tool-calling,looped with a tool-execution node) used by `streamlit_app.py`.

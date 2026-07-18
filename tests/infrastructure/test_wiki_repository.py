@@ -1,22 +1,5 @@
-from pathlib import Path
-
-from src.utils import slugify, normalize_wiki_path, path_to_wiki_ref, PROJECT_ROOT
-
-
-def test_slugify_basic_text():
-    assert slugify("LLM Wiki") == "llm-wiki"
-
-
-def test_slugify_polish_characters():
-    assert slugify("Zażółć gęślą jaźń") == "zażółć-gęślą-jaźń"
-
-
-def test_slugify_removes_extra_spaces():
-    assert slugify("  LLM   Wiki  ") == "llm-wiki"
-
-
-def test_slugify_returns_untitled_for_empty_text():
-    assert slugify("") == "untitled"
+from src.infrastructure.file_utils import PROJECT_ROOT
+from src.infrastructure.wiki_repository import normalize_wiki_path, path_to_wiki_ref
 
 
 def test_normalize_wiki_path_without_extension():

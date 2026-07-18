@@ -1,15 +1,11 @@
-import argparse
 import json
 from pathlib import Path
 
-from .llm_client import ask_llm
-from .utils import (
-    PROJECT_ROOT,
-    append_to_log,
-    read_text_file,
-    slugify,
-    write_text_file,
-)
+from ..domain.ingest_summary import IngestSummary
+from ..infrastructure.file_utils import PROJECT_ROOT, read_text_file, slugify, write_text_file
+from ..infrastructure.llm_client import ask_llm
+from ..infrastructure.raw_repository import resolve_raw_path
+from ..infrastructure.wiki_repository import append_to_log
 
 
 def build_ingest_prompt(
@@ -248,15 +244,8 @@ def build_log_message(data: dict) -> str:
     return "\n".join(lines)
 
 
-def ingest_file(raw_file_path: str) -> None:
-    raw_path = Path(raw_file_path).resolve()
-    raw_root = (PROJECT_ROOT / "raw").resolve()
-
-    if raw_root not in raw_path.parents:
-        raise ValueError(
-            "Źródło musi znajdować się w folderze raw/. "
-            "Nie przetwarzaj plików spoza raw/."
-        )
+def ingest_source(raw_file_path: str) -> IngestSummary:
+    raw_path = resolve_raw_path(raw_file_path)
 
     source_title = raw_path.stem
     source_text = read_text_file(raw_path)
@@ -281,23 +270,8 @@ def ingest_file(raw_file_path: str) -> None:
     log_message = build_log_message(data)
     append_to_log(log_message)
 
-    print("Gotowe. Utworzono lub zaktualizowano strony Wiki:")
-    print(f"- Source: {source_path}")
-
-    for path in entity_paths:
-        print(f"- Entity: {path}")
-
-    for path in concept_paths:
-        print(f"- Concept: {path}")
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Dodaj źródło do LLM Wiki.")
-    parser.add_argument("file", help="Ścieżka do pliku źródłowego w raw/.")
-
-    args = parser.parse_args()
-    ingest_file(args.file)
-
-
-if __name__ == "__main__":
-    main()
+    return IngestSummary(
+        source_path=source_path,
+        entity_paths=entity_paths,
+        concept_paths=concept_paths,
+    )

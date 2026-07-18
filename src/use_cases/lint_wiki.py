@@ -1,16 +1,10 @@
 import re
 from pathlib import Path
-from typing import Any
 
 import frontmatter
 
-from .utils import (
-    PROJECT_ROOT,
-    list_wiki_content_files,
-    path_to_wiki_ref,
-    read_text_file,
-    write_text_file,
-)
+from ..infrastructure.file_utils import PROJECT_ROOT, read_text_file, write_text_file
+from ..infrastructure.wiki_repository import list_wiki_content_files, path_to_wiki_ref
 
 
 REQUIRED_FRONTMATTER_FIELDS = [
@@ -280,7 +274,7 @@ Status: {status}
     return report
 
 
-def lint_wiki() -> None:
+def lint_wiki() -> tuple[Path, str]:
     files = list_wiki_content_files()
 
     frontmatter_issues = check_frontmatter(files)
@@ -301,9 +295,4 @@ def lint_wiki() -> None:
     report_path = PROJECT_ROOT / "wiki" / "reports" / "health-report.md"
     write_text_file(report_path, report)
 
-    print(report)
-    print(f"\nRaport zapisany w: {report_path}")
-
-
-if __name__ == "__main__":
-    lint_wiki()
+    return report_path, report
